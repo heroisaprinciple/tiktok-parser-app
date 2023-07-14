@@ -7,93 +7,67 @@ require 'open-uri'
 require 'selenium-webdriver'
 require 'selenium/webdriver/common/wait'
 
-# puts "Enter the query to use: "
-# query = gets.chomp
-# url = "https://www.tiktok.com/search?q=#{query}"
-# response = HTTParty.get(url)
-# doc = Nokogiri::HTML(response.body)
-#
-# # accounts names
-# accounts = doc.css(".tiktok-1u48guj-DivSearchContainer") # cats
-# # tiktok-ubsdy8-DivVideoFeed eegew6e0
-# # <div data-e2e="search_top-item-list" mode="search-video-list" class="tiktok-ubsdy8-DivVideoFeed eegew6e0"></div>
-# puts accounts.first.children
-# puts('-----')
-# panel_containers = accounts.first.children.each{ |el| puts el }
-# puts('aaaaaaaaaaaaaaaa')
-# element = doc.at_css('div[data-e2e="search_top-item-list"][mode="search-video-list"].tiktok-ubsdy8-DivVideoFeed.eegew6e0')
-# puts element.children
-
-puts "Enter the query to use: "
+puts 'Enter the query to use: '
 query = gets.chomp
-url = "https://www.tiktok.com/search?q=#{query}"
+puts 'Also, include how many users and info about them you want to see. In essence, 10 users.'
+number = gets.chomp.to_i
+
+# tags: 'https://www.tiktok.com/tag/askingquestions'
+
+# notitsmenicksmithy or jamesdoylefitness or bobbysolez or kerana0208 or yungalyy
+
+url = query.include?('#') ? "https://www.tiktok.com/tag/#{query}" : "https://www.tiktok.com/search?q=#{query}"
 
 driver = Selenium::WebDriver.for :chrome
-wait = Selenium::WebDriver::Wait.new(timeout: 30) # Adjust the timeout as needed
+wait = Selenium::WebDriver::Wait.new(timeout: 30)
+
 driver.get url
 
-# Wait until at least one matching element is present
-# 'tiktok-22xkqc-StyledLink.er1vbsz0 video'
-# tiktok-2zn17v-PUniqueId etrd4pu6
-video_element = wait.until { driver.find_element(css: '.tiktok-2zn17v-PUniqueId.etrd4pu6') }
-p video_element.text
+data = []
+i = 1
 
-while true do
+while i < number do
   quote_container = wait.until { driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
   quote_container.each do |container|
-    quote_text = container.find_element(css: '.tiktok-2zn17v-PUniqueId.etrd4pu6').attribute('textContent')
-    p quote_text
+    name = container.find_element(css: '.tiktok-2zn17v-PUniqueId.etrd4pu6').attribute('textContent')
+    user_url = "https://www.tiktok.com/@#{name}"
+    res = HTTParty.get(user_url)
+    docs = Nokogiri::HTML(res.body)
+    # docs = docs.to_json
+    puts('--------')
+
+    account_els = docs.css('.tiktok-rxe1eo-DivNumber strong')
+    followers_element = account_els.find { |el| el.attribute('title').value == 'Followers' }
+    followers_count = followers_element.text
+    p(followers_count.to_json)
+
+    avg_nums = docs.css('.video-count')
+    avg = avg_nums.map { |el| el.text.to_f }.sum / avg_nums.size
+
+    description = docs.css('.tiktok-vdfu13-H2ShareDesc.e1457k4r3')
+    desc = description.text
+    email = desc.scan(/\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\b/i).join
+    social_accounts = desc.scan(/(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Youtube|Discord): ?\(?@?(\w+)\)?/i)
+                          .map { |network, username| "#{network}: #{username}" }
+                          .join(' ')
+                          .gsub(/:\s/, ':')
+
+    p social_accounts
+
+    data << [name, followers_count, avg, desc, email, social_accounts]
+    p data
+    i += 1
   end
 end
 
+def generate_csv(data)
+  CSV.open('tiktoker_followers.csv', 'w+',
+           write_headers: true,
+           headers: %w[Account Followers Avg_Views Channel_Desc Email Other_Accounts]) do |csv|
+    data.each do |row|
+      csv << row
+    end
+  end
+end
 
-# while true do
-#   quote_container = driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc etrd4pu0')
-#   quote_container.each do |container|
-#     quote_text = container.find_element(css: '.text').attribute('textContent')
-#     p quote_text
-#   end
-# end
-
-
-# div id="tabs-0-panel-search_top" role="tabpanel" tabindex="0" aria-labelledby="tabs-0-tab-search_top" class="tiktok-1fwlm1o-DivPanelContainer ea3pfar3">
-# <style data-emotion="tiktok 1qb12g8-DivThreeColumnContainer">.tiktok-1qb12g8-DivThreeColumnContainer{width:100%;}</style>
-# <div class="tiktok-1qb12g8-DivThreeColumnContainer eegew6e2">
-# <style data-emotion="tiktok ubsdy8-DivVideoFeed">.tiktok-ubsdy8-DivVideoFeed{display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;-webkit-box-flex-wrap:wrap;-webkit-flex-wrap:wrap;-ms-flex-wrap:wrap;flex-wrap:wrap;}.tiktok-ubsdy8-DivVideoFeed::after{content:"";height:0;display:block;clear:both;}@media screen and (max-width: 767px){.tiktok-ubsdy8-DivVideoFeed{width:100%;}}</style>
-# <div data-e2e="search_top-item-list" mode="search-video-list" class="tiktok-ubsdy8-DivVideoFeed eegew6e0"></div>
-#
-# element = doc.at_css('div')
-# element.children.each do |el|
-#   if el['class'] == 'tiktok-ubsdy8-DivVideoFeed eegew6e0'
-#     puts el
-#   end
-# end
-
-# puts "Enter the name of the tiktoker: "
-# user_name = gets.chomp
-# url = "https://www.tiktok.com/@#{user_name}"
-# response = HTTParty.get(url)
-# doc = Nokogiri::HTML(response.body) # itsmenicksmithy2 or wwsaqrigdpc
-#
-# # N of followers
-# account_els = doc.css(".tiktok-rxe1eo-DivNumber strong")
-# followers_element = account_els.find { |el| el.attribute('title').value == 'Followers' }
-# followers_count = followers_element.text
-# puts "Number of followers: #{followers_count}"
-#
-# # avg n of views
-# avg_nums = doc.css(".video-count")
-# avg = avg_nums.map { |el| el.text.to_f }.sum / avg_nums.size
-# puts "The average num of views: #{avg}"
-#
-# def generate_csv(data)
-#   CSV.open('tiktoker_followers.csv', 'w+',
-#            write_headers: true,
-#            headers: %w[Account Followers Avg Views ]) do |csv|
-#     data.each do |row|
-#       csv << row
-#     end
-#   end
-# end
-#
-# generate_csv([[user_name, followers_count]])
+generate_csv(data)
