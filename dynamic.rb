@@ -14,7 +14,6 @@ quotes = []
 while true do
   quote_container = driver.find_elements(css: '.quote')
   quote_container.each do |container|
-    # quote_text = container.find_element(css: '.text').text
     quote_text = container.find_element(css: '.text').attribute('textContent')
     author = container.find_element(css: '.author').attribute('textContent')
     quotes << [quote_text, author]
@@ -35,4 +34,3 @@ CSV.open('quotes.csv',
     csv << quote
   end
 end
-
