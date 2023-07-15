@@ -80,7 +80,7 @@ class TikTokParser
   end
 
   def generate_csv(data)
-    CSV.open('tiktoker_followers.csv', 'w+', write_headers: true,
+    CSV.open('tiktok_data.csv', 'w+', write_headers: true,
              headers: %w[Account Followers Avg_Views Channel_Desc Email Other_Accounts]) do |csv|
       data.each do |row|
         csv << row
