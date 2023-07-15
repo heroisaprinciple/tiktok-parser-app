@@ -7,51 +7,40 @@ require 'open-uri'
 require 'selenium-webdriver'
 require 'selenium/webdriver/common/wait'
 
-puts 'Enter the query to use: '
-$query = gets.chomp
-puts 'Also, include how many users and info about them you want to see. In essence, 10 users.'
-$number = gets.chomp.to_i
+def find_user_data(query, number)
+  url = query.include?('#') ? "https://www.tiktok.com/tag/#{query}" : "https://www.tiktok.com/search?q=#{query}"
 
-# tags: 'https://www.tiktok.com/tag/askingquestions'
+  driver = Selenium::WebDriver.for :chrome
+  wait = Selenium::WebDriver::Wait.new(timeout: 30)
+  driver.get(url)
 
-# notitsmenicksmithy or jamesdoylefitness or bobbysolez or kerana0208 or yungalyy
-
-url = $query.include?('#') ? "https://www.tiktok.com/tag/#{$query}".gsub('#', '') : "https://www.tiktok.com/search?q=#{$query}"
-
-$driver = Selenium::WebDriver.for :chrome
-$wait = Selenium::WebDriver::Wait.new(timeout: 30)
-
-# class for p for #: 'tiktok-18g0m3y-PInfo-StyledH3UniqueId e1aajktk12'
-$driver.get url
-
-# if just word
-def parsing_by_keyword
   data = []
-  i = 1
+  i = 0
 
-  while i < $number do
-    video_container = $wait.until { $driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
-    video_container.each do |container|
-      name = find_name(container)
+  while i < number
+    quote_container = wait.until { driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
+
+    quote_container.each do |container|
+      name = container.find_element(css: '.tiktok-2zn17v-PUniqueId.etrd4pu6').attribute('textContent')
       user_url = "https://www.tiktok.com/@#{name}"
       res = HTTParty.get(user_url)
       docs = Nokogiri::HTML(res.body)
 
       followers_count = find_followers_amount(docs)
+      avg_views = find_average_views(docs)
+      description = find_description(docs)
+      email = find_email(description)
+      social_accounts = find_socials(description)
 
-      avg = find_average_views(docs)
-
-      desc = find_description(docs)
-
-      email = find_email(desc)
-
-      social_accounts = find_socials(desc)
-
-      data << [name, followers_count, avg, desc, email, social_accounts]
+      data << [name, followers_count, avg_views, description, email, social_accounts]
       p data
       i += 1
+      break if i >= number
     end
   end
+
+  driver.quit
+  data
 end
 
 def find_name(container)
@@ -95,5 +84,10 @@ def generate_csv(data)
   end
 end
 
-parsing_by_keyword
+puts 'Enter the query to use:'
+query = gets.chomp
+puts 'Enter the number of users and info about them you want to see (e.g., 10):'
+number = gets.chomp.to_i
+
+data = find_user_data(query, number)
 generate_csv(data)
