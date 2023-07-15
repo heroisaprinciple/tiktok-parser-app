@@ -2,6 +2,7 @@ require 'csv'
 require 'nokogiri'
 require 'httparty'
 require 'selenium-webdriver'
+require 'byebug'
 
 class TikTokParser
   def initialize
@@ -10,7 +11,7 @@ class TikTokParser
   end
 
   def scrape_user_data(query, number)
-    url = query.include?('#') ? "https://www.tiktok.com/tag/#{query}" : "https://www.tiktok.com/search?q=#{query}"
+    url = query.include?('#') ? "https://www.tiktok.com/tag/#{query}".gsub('#', '') : "https://www.tiktok.com/search?q=#{query}"
     @driver.get(url)
 
     data = []
