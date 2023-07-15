@@ -17,10 +17,16 @@ class TikTokParser
     data = []
     i = 0
 
-    while i < number
-      quote_container = @wait.until { @driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
+    # username for tags urls
+    containers_usernames = @wait.until { @driver.find_elements(css: '.user-name.tiktok-1gi42ki-PUserName.exdlci15') }
+    names = containers_usernames.each do |v|
+      v.attribute('textContent')
+    end
 
-      quote_container.each do |container|
+    while i < number
+      video_container = @wait.until { @driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
+
+      video_container.each do |container|
         name = find_name(container)
         user_url = "https://www.tiktok.com/@#{name}"
         res = HTTParty.get(user_url)
@@ -52,6 +58,10 @@ class TikTokParser
   def find_name(container)
     container.find_element(css: '.tiktok-2zn17v-PUniqueId.etrd4pu6').attribute('textContent')
   end
+
+  # def find_name_for_tags()
+  #   container.
+  # end
 
   def find_followers_amount(docs)
     account_els = docs.css('.tiktok-rxe1eo-DivNumber strong')
