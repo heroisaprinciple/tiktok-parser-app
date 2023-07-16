@@ -22,23 +22,21 @@ class TikTokParser
     data = []
     i = 0
 
-    if query.include?('#')
-      containers_usernames = @wait.until { @driver.find_elements(css: '.user-name.tiktok-1gi42ki-PUserName.exdlci15') }
-      names = containers_usernames.map { |v| v.attribute('textContent') }
-
-      while i < number
-        names.each do |name|
+    while i < number
+      if !query.include?('#')
+        video_container = @wait.until { @driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
+        video_container.each do |container|
+          name = find_name(container)
           user_url = "https://www.tiktok.com/@#{name}"
           data << [name, scrape_user_info(user_url)].flatten
           i += 1
           break if i >= number
         end
-      end
-    else
-      while i < number
-        video_container = @wait.until { @driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
-        video_container.each do |container|
-          name = find_name(container)
+      else
+        containers_usernames = @wait.until { @driver.find_elements(css: '.user-name.tiktok-1gi42ki-PUserName.exdlci15') }
+        names = containers_usernames.map { |v| v.attribute('textContent') }
+
+        names.each do |name|
           user_url = "https://www.tiktok.com/@#{name}"
           data << [name, scrape_user_info(user_url)].flatten
           i += 1
@@ -126,6 +124,7 @@ class CSVGenerator
       end
     end
   end
+
   def message_csv_creation
     puts 'CSV file is filled with data now!'
   end
@@ -143,4 +142,3 @@ data = scraper.scrape_data(query, number)
 csv_generator = CSVGenerator.new
 csv_generator.generate_csv(data)
 csv_generator.message_csv_creation
-
