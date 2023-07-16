@@ -1,9 +1,12 @@
+# frozen_string_literal: true
+
 require 'csv'
 require 'nokogiri'
 require 'httparty'
 require 'selenium-webdriver'
 require 'byebug'
 
+# The class to process tiktok data.
 class TikTokParser
   def initialize
     @driver = Selenium::WebDriver.for :chrome
