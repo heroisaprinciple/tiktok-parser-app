@@ -6,6 +6,11 @@ require 'httparty'
 require 'selenium-webdriver'
 require 'byebug'
 
+TAG_URL = "https://www.tiktok.com/tag/"
+KEYWORD_URL = "https://www.tiktok.com/search?q="
+EMAIL_REGEX = /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\b/i
+SOCIALS_REGEX = /\W(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Discord|Twitch):?\s?-?\s?\(?-?@?(\w+)\)?/i
+
 # The class to process tiktok data.
 class TikTokParser
   def initialize
@@ -19,7 +24,7 @@ class TikTokParser
   # @param number [Integer] The number of queries.
   # @return [Array<Array>] An array of user data, each represented as an array of values.
   def scrape_data(query, number)
-    url = query.include?('#') ? "https://www.tiktok.com/tag/#{query}".gsub('#', '') : "https://www.tiktok.com/search?q=#{query}"
+    url = query.include?('#') ? "#{TAG_URL}#{query.gsub('#', '')}" : "#{KEYWORD_URL}#{query}"
     @driver.get(url)
 
     data = []
@@ -107,41 +112,12 @@ class TikTokParser
   end
 
   def find_email(desc)
-    desc.scan(/\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\b/i).join
+    desc.scan(EMAIL_REGEX).join
   end
 
   def find_socials(desc)
-    desc.scan(/\W(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Discord|Twitch):?\s?-?\s?\(?-?@?(\w+)\)?/i)
+    desc.scan(SOCIALS_REGEX)
         .map { |network, username| "#{network}: #{username}" }
         .join(' ')
   end
 end
-
-# The CSVGenerator class is responsible for generating CSV files.
-class CSVGenerator
-  def generate_csv(data)
-    CSV.open('tiktok_data.csv', 'w+', write_headers: true,
-             headers: [:Account, :Followers, :Avg_Views, :Channel_Desc, :Email, :Other_Accounts]) do |csv|
-      data.each do |row|
-        csv << row
-      end
-    end
-  end
-
-  def message_csv_creation
-    puts 'CSV file is filled with data now!'
-  end
-end
-
-puts 'Enter the query to use. In essence, #enrique or ruby: '
-query = gets.chomp
-puts 'Enter the number of queries you want to be shown. In essence, 10: '
-number = gets.chomp.to_i
-puts 'Please, wait some seconds for us to proceed.'
-
-scraper = TikTokParser.new
-data = scraper.scrape_data(query, number)
-
-csv_generator = CSVGenerator.new
-csv_generator.generate_csv(data)
-csv_generator.message_csv_creation
