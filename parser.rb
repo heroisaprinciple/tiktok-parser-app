@@ -10,38 +10,40 @@ class TikTokParser
     @wait = Selenium::WebDriver::Wait.new(timeout: 30)
   end
 
-  def scrape_user_data(query, number)
+  # Scrapes user data based on the specified query and number of queries wanted to display.
+  #
+  # @param query [String] The query to search for on TikTok.
+  # @param number [Integer] The number of queries.
+  # @return [Array<Array>] An array of user data, each represented as an array of values.
+  def scrape_data(query, number)
     url = query.include?('#') ? "https://www.tiktok.com/tag/#{query}".gsub('#', '') : "https://www.tiktok.com/search?q=#{query}"
     @driver.get(url)
 
     data = []
     i = 0
 
-    # username for tags urls
-    containers_usernames = @wait.until { @driver.find_elements(css: '.user-name.tiktok-1gi42ki-PUserName.exdlci15') }
-    names = containers_usernames.each do |v|
-      v.attribute('textContent')
-    end
+    if query.include?('#')
+      containers_usernames = @wait.until { @driver.find_elements(css: '.user-name.tiktok-1gi42ki-PUserName.exdlci15') }
+      names = containers_usernames.map { |v| v.attribute('textContent') }
 
-    while i < number
-      video_container = @wait.until { @driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
-
-      video_container.each do |container|
-        name = find_name(container)
-        user_url = "https://www.tiktok.com/@#{name}"
-        res = HTTParty.get(user_url)
-        docs = Nokogiri::HTML(res.body)
-
-        followers_count = find_followers_amount(docs)
-        avg_views = find_average_views(docs)
-        description = find_description(docs)
-        email = find_email(description)
-        social_accounts = find_socials(description)
-
-        data << [name, followers_count, avg_views, description, email, social_accounts]
-        p data
-        i += 1
-        break if i >= number
+      while i < number
+        names.each do |name|
+          user_url = "https://www.tiktok.com/@#{name}"
+          data << [name, scrape_user_info(user_url)].flatten
+          i += 1
+          break if i >= number
+        end
+      end
+    else
+      while i < number
+        video_container = @wait.until { @driver.find_elements(css: '.tiktok-hbrxqe-DivVideoSearchCardDesc.etrd4pu0') }
+        video_container.each do |container|
+          name = find_name(container)
+          user_url = "https://www.tiktok.com/@#{name}"
+          data << [name, scrape_user_info(user_url)].flatten
+          i += 1
+          break if i >= number
+        end
       end
     end
 
@@ -49,31 +51,55 @@ class TikTokParser
     data
   end
 
-  def call_generate_csv(data)
-    generate_csv(data)
-  end
-
   private
 
+  # Scrapes user data based on the specified query and number of users.
+  #
+  # @return [Array] An array of user data, each represented as an array of values.
+  def scrape_user_info(user_url)
+    res = HTTParty.get(user_url)
+    docs = Nokogiri::HTML(res.body)
+
+    followers_count = find_followers_amount(docs)
+    avg_views = find_average_views(docs)
+    description = find_description(docs)
+    email = find_email(description)
+    social_accounts = find_socials(description)
+
+    [followers_count, avg_views, description, email, social_accounts]
+  end
+
+  # Finds the name of a user based on the provided container element.
+  #
+  # @param container [SeleniumWebElement] The container element containing the user information.
+  # @return [String] The name of the user.
   def find_name(container)
     container.find_element(css: '.tiktok-2zn17v-PUniqueId.etrd4pu6').attribute('textContent')
   end
 
-  # def find_name_for_tags()
-  #   container.
-  # end
-
+  # Finds the number of followers for a user based on the provided Nokogiri document.
+  #
+  # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
+  # @return [String] The number of followers for the user.
   def find_followers_amount(docs)
     account_els = docs.css('.tiktok-rxe1eo-DivNumber strong')
     followers_element = account_els.find { |el| el.attribute('title').value == 'Followers' }
     followers_element.text
   end
 
+  # Finds the average number of views for a user's videos based on the provided Nokogiri document.
+  #
+  # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
+  # @return [Float] The average number of views for the user's videos.
   def find_average_views(docs)
     avg_nums = docs.css('.video-count')
     avg_nums.map { |el| el.text.to_f }.sum / avg_nums.size
   end
 
+  # Finds the description for a user based on the provided Nokogiri document.
+  #
+  # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
+  # @return [String] The description of the user's channel.
   def find_description(docs)
     description = docs.css('.tiktok-vdfu13-H2ShareDesc.e1457k4r3')
     description.text
@@ -84,31 +110,37 @@ class TikTokParser
   end
 
   def find_socials(desc)
-    desc.scan(/(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Youtube|Discord): ?\(?@?(\w+)\)?/i)
+    desc.scan(/\W(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Discord|Twitch):?\s?-?\s?\(?-?@?(\w+)\)?/i)
         .map { |network, username| "#{network}: #{username}" }
         .join(' ')
-        .gsub(/:\s/, ':')
   end
+end
 
+# The CSVGenerator class is responsible for generating CSV files.
+class CSVGenerator
   def generate_csv(data)
     CSV.open('tiktok_data.csv', 'w+', write_headers: true,
-             headers: %w[Account Followers Avg_Views Channel_Desc Email Other_Accounts]) do |csv|
+             headers: [:Account, :Followers, :Avg_Views, :Channel_Desc, :Email, :Other_Accounts]) do |csv|
       data.each do |row|
         csv << row
       end
     end
   end
+  def message_csv_creation
+    puts 'CSV file is filled with data now!'
+  end
 end
 
-# tags: 'https://www.tiktok.com/tag/askingquestions'
-
-# notitsmenicksmithy or jamesdoylefitness or bobbysolez or kerana0208 or yungalyy
-
-puts 'Enter the query to use:'
+puts 'Enter the query to use. In essence, #enrique or ruby: '
 query = gets.chomp
-puts 'Enter the number of users and info about them you want to see (e.g., 10):'
+puts 'Enter the number of queries you want to be shown. In essence, 10: '
 number = gets.chomp.to_i
+puts 'Please, wait some seconds for us to proceed.'
 
 scraper = TikTokParser.new
-data = scraper.scrape_user_data(query, number)
-scraper.call_generate_csv(data)
+data = scraper.scrape_data(query, number)
+
+csv_generator = CSVGenerator.new
+csv_generator.generate_csv(data)
+csv_generator.message_csv_creation
+
