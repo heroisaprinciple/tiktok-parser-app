@@ -6,4 +6,4 @@ gem 'selenium-webdriver'
 gem 'csv'
 gem 'rubocop'
 gem 'brakeman'
-
+gem 'rspec'
