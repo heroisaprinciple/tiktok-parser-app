@@ -31,24 +31,18 @@ class TikTokParser
 
     while i < number
       if !query.include?('#')
-        video_container = @wait.until { @driver.find_elements(css: '[data-e2e="search-card-desc"]') }
-        video_container.each do |container|
-          name = find_name(container)
-          user_url = "#{USER_URL}#{name}"
-          data << [name, scrape_user_info(user_url)].flatten
-          i += 1
-          break if i >= number
-        end
+        names = @wait.until { @driver.find_elements(css: '[data-e2e="search-card-user-unique-id"]') }
+                               .map { |v| v.attribute('textContent') }
       else
-        containers_usernames = @wait.until { @driver.find_elements(css: '.e1cg0wnj1') }
-        names = containers_usernames.map { |v| v.attribute('textContent') }
+        names = @wait.until { @driver.find_elements(css: '[data-e2e="challenge-item-username"]') }
+                     .map { |v| v.attribute('textContent') }
+      end
 
-        names.each do |name|
-          user_url = "#{USER_URL}#{name}"
-          data << [name, scrape_user_info(user_url)].flatten
-          i += 1
-          break if i >= number
-        end
+      names.each do |name|
+        user_url = "#{USER_URL}#{name}"
+        data << [name, scrape_user_info(user_url)].flatten
+        i += 1
+        break if i >= number
       end
     end
 
@@ -78,9 +72,9 @@ class TikTokParser
   #
   # @param container [SeleniumWebElement] The container element containing the user information.
   # @return [String] The name of the user.
-  def find_name(container)
-    container.find_element(css: '[data-e2e="search-card-user-unique-id"]').attribute('textContent')
-  end
+  # def find_name(container)
+  #   container.find_element(css: '[data-e2e="search-card-user-unique-id"]').attribute('textContent')
+  # end
 
   # Finds the number of followers for a user based on the provided Nokogiri document.
   #
@@ -95,7 +89,6 @@ class TikTokParser
   # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
   # @return [Float] The average number of views for the user's videos.
   def find_average_views(docs)
-    # #jujutsukaisen
     avg_nums = docs.css('[data-e2e="video-views"]')
     average_views = avg_nums.sum { |el| el.text.to_f } / avg_nums.size unless avg_nums.empty?
     average_views&.round(2)
