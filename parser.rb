@@ -4,17 +4,32 @@ require 'httparty'
 require 'selenium-webdriver'
 require 'byebug'
 
-TAG_URL = "https://www.tiktok.com/tag/"
-KEYWORD_URL = "https://www.tiktok.com/search?q="
-USER_URL = "https://www.tiktok.com/@"
+URL = 'https://www.tiktok.com/search?q='
+USER_URL = 'https://www.tiktok.com/@'
 EMAIL_REGEX = /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\b/i
 SOCIALS_REGEX = /\W(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Discord|Twitch):?\s?-?\s?\(?-?@?(\w+)\)?/i
 
 # The class to process tiktok data.
 class TikTokParser
   def initialize
-    @driver = Selenium::WebDriver.for :chrome
+    @driver = create_driver
     @wait = Selenium::WebDriver::Wait.new(timeout: 30)
+  end
+
+  def create_driver
+    options = Selenium::WebDriver::Options.chrome
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument('--incognito')
+    options.add_argument('--headless')
+    options.add_argument('--window-size=1920,1080')
+
+    Selenium::WebDriver.for :chrome, options: options
+  end
+
+  def scroll_to_bottom
+    scroll_script = 'window.scrollTo(0, document.body.scrollHeight);'
+    @driver.execute_script(scroll_script)
+    sleep(2)
   end
 
   # Scrapes user data based on the specified query and number of queries wanted to display.
@@ -23,34 +38,61 @@ class TikTokParser
   # @param number [Integer] The number of queries.
   # @return [Array<Array>] An array of user data, each represented as an array of values.
   def scrape_data(query, number)
-    url = query.include?('#') ? "#{TAG_URL}#{query.gsub('#', '')}" : "#{KEYWORD_URL}#{query}"
-    @driver.get(url)
+    timestamp = (Time.now.to_f * 1000).to_i
+    url = query.include?('#') ? "#{URL}#{query.gsub('#', '')}&=#{timestamp}"
+            : "#{URL}#{query}&t=#{timestamp}"
+    
+    @driver.navigate.to(url)
+    sleep(4)
 
     data = []
-    i = 0
+    counter = 0
 
-    while i < number
-      if !query.include?('#')
-        names = @wait.until { @driver.find_elements(css: '[data-e2e="search-card-user-unique-id"]') }
-                               .map { |v| v.attribute('textContent') }
-      else
-        names = @wait.until { @driver.find_elements(css: '[data-e2e="challenge-item-username"]') }
-                     .map { |v| v.attribute('textContent') }
+    # TODO: refactor it
+    loop do
+      if counter % 12 == 0
+        scroll_to_bottom
+        sleep(3)
+        names = @driver.find_elements(css: '[data-e2e="search-card-user-unique-id"]')
+                       .map { |v| v.attribute('textContent') }
       end
 
-      names.each do |name|
-        user_url = "#{USER_URL}#{name}"
-        data << [name, scrape_user_info(user_url)].flatten
-        i += 1
-        break if i >= number
+      chunked_names = names.slice(counter, names.length)
+      user_data = collect_user_info(chunked_names, counter, number)
+      data.concat(user_data)
+      counter += user_data.length
+
+      if counter >= number
+        @driver.quit
+        break
       end
     end
-
-    @driver.quit
     data
   end
 
   private
+
+  # Collects user information for a chunk of users.
+  #
+  # @param names [Array<String>] Array of usernames to collect information for.
+  # @param counter [Integer] Current count of collected user information.
+  # @param number [Integer] Total number of user information to collect.
+  # @return [Array<Array>] An array of user data, each represented as an array of values.
+
+  # TODO: also, add scrolling functionality here
+  def collect_user_info(names, counter, number)
+    user_data = []
+
+    names.each do |name|
+      break if counter >= number
+
+      user_url = "#{USER_URL}#{name}"
+      sleep(3)
+      user_data << [name, scrape_user_info(user_url)].flatten
+      counter += 1
+    end
+    user_data
+  end
 
   # Scrapes user data based on the specified query and number of users.
   #
@@ -67,14 +109,6 @@ class TikTokParser
 
     [followers_count, avg_views, description, email, social_accounts]
   end
-
-  # Finds the name of a user based on the provided container element.
-  #
-  # @param container [SeleniumWebElement] The container element containing the user information.
-  # @return [String] The name of the user.
-  # def find_name(container)
-  #   container.find_element(css: '[data-e2e="search-card-user-unique-id"]').attribute('textContent')
-  # end
 
   # Finds the number of followers for a user based on the provided Nokogiri document.
   #
