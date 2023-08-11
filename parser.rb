@@ -4,71 +4,16 @@ require 'httparty'
 require 'selenium-webdriver'
 require 'byebug'
 
-URL = 'https://www.tiktok.com/search?q='
-USER_URL = 'https://www.tiktok.com/@'
-EMAIL_REGEX = /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\b/i
-SOCIALS_REGEX = /\W(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Discord|Twitch):?\s?-?\s?\(?-?@?(\w+)\)?/i
+require './variables'
+require './modules/driver'
+require './modules/driver_navigations'
+require './modules/scrape_results'
 
 # The class to process tiktok data.
 class TikTokParser
-  def initialize
-    @driver = create_driver
-    @wait = Selenium::WebDriver::Wait.new(timeout: 30)
-  end
-
-  def create_driver
-    options = Selenium::WebDriver::Options.chrome
-    options.add_argument('--ignore-certificate-errors')
-    options.add_argument('--incognito')
-    options.add_argument('--headless')
-    options.add_argument('--window-size=1920,1080')
-
-    Selenium::WebDriver.for :chrome, options: options
-  end
-
-  def scroll_to_bottom
-    scroll_script = 'window.scrollTo(0, document.body.scrollHeight);'
-    @driver.execute_script(scroll_script)
-    sleep(2)
-  end
-
-  # Scrapes user data based on the specified query and number of queries wanted to display.
-  #
-  # @param query [String] The query to search for on TikTok.
-  # @param number [Integer] The number of queries.
-  # @return [Array<Array>] An array of user data, each represented as an array of values.
-  def scrape_data(query, number)
-    timestamp = (Time.now.to_f * 1000).to_i
-    url = query.include?('#') ? "#{URL}#{query.gsub('#', '')}&=#{timestamp}"
-            : "#{URL}#{query}&t=#{timestamp}"
-    
-    @driver.navigate.to(url)
-    sleep(4)
-
-    data = []
-    counter = 0
-
-    # TODO: refactor it
-    loop do
-      if counter % 12 == 0
-        scroll_to_bottom
-        sleep(3)
-        names = @driver.find_elements(css: '[data-e2e="search-card-user-unique-id"]')
-                       .map { |v| v.attribute('textContent') }
-      end
-
-      chunked_names = names.slice(counter, names.length)
-      user_data = collect_user_info(chunked_names, counter, number)
-      data.concat(user_data)
-      counter += user_data.length
-
-      if counter >= number
-        @driver.quit
-        break
-      end
-    end
-    data
-  end
+  include Driver
+  include DriverNavigations
+  include ScrapeResults
 
   private
 
@@ -78,16 +23,14 @@ class TikTokParser
   # @param counter [Integer] Current count of collected user information.
   # @param number [Integer] Total number of user information to collect.
   # @return [Array<Array>] An array of user data, each represented as an array of values.
-
-  # TODO: also, add scrolling functionality here
-  def collect_user_info(names, counter, number)
+  def collect_info(names, counter, number)
     user_data = []
 
     names.each do |name|
       break if counter >= number
 
       user_url = "#{USER_URL}#{name}"
-      sleep(3)
+      sleep_time(NAVIGATION_SLEEP_TIME)
       user_data << [name, scrape_user_info(user_url)].flatten
       counter += 1
     end
@@ -98,16 +41,27 @@ class TikTokParser
   #
   # @return [Array] An array of user data, each represented as an array of values.
   def scrape_user_info(user_url)
+    # downloads 16 vids on every profile
     res = HTTParty.get(user_url)
     docs = Nokogiri::HTML(res.body)
 
-    followers_count = find_followers_amount(docs)
-    avg_views = find_average_views(docs)
-    description = find_description(docs)
-    email = find_email(description)
-    social_accounts = find_socials(description)
+    [
+      find_user_subtitle(docs),
+      find_following_amount(docs),
+      find_followers_amount(docs),
+      find_avg_views_num(docs),
+      description = find_description(docs),
+      find_email(description),
+      find_socials(description)
+    ]
+  end
 
-    [followers_count, avg_views, description, email, social_accounts]
+  # Finds the user subtitle for a user based on the provided Nokogiri document.
+  #
+  # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
+  # @return [String] The subtitle of a user.
+  def find_user_subtitle(docs)
+    docs.css('[data-e2e="user-subtitle"]').text
   end
 
   # Finds the number of followers for a user based on the provided Nokogiri document.
@@ -118,23 +72,37 @@ class TikTokParser
     docs.css('[data-e2e="followers-count"]').text
   end
 
+  # Finds the number of followings for a user based on the provided Nokogiri document.
+  #
+  # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
+  # @return [String] The number of followings for the user.
+  def find_following_amount(docs)
+    docs.css('[data-e2e="following-count"]').text
+  end
+
   # Finds the average number of views for a user's videos based on the provided Nokogiri document.
   #
   # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
   # @return [Float] The average number of views for the user's videos.
-  def find_average_views(docs)
-    avg_nums = docs.css('[data-e2e="video-views"]')
-    average_views = avg_nums.sum { |el| el.text.to_f } / avg_nums.size unless avg_nums.empty?
+  def find_avg_views_num(docs)
+    views = docs.css('[data-e2e="video-views"]').map(&:text)
+    average_views = views.sum(&:to_f) / views.length unless views.empty?
     average_views&.round(2)
   end
+
+  # Finds the average number of comments for a user's videos based on the provided Nokogiri document.
+  #
+  # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
+  # @return [Float] The average number of comments for the user's videos.
+  # TODO: implement this
+  def find_avg_comments_num(docs); end
 
   # Finds the description for a user based on the provided Nokogiri document.
   #
   # @param docs [Nokogiri::HTML::Document] The Nokogiri document representing the user's page.
   # @return [String] The description of the user's channel.
   def find_description(docs)
-    description = docs.css('[data-e2e="user-bio"]')
-    description.text
+    docs.css('[data-e2e="user-bio"]').text
   end
 
   def find_email(desc)
