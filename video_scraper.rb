@@ -7,13 +7,14 @@ require 'byebug'
 require './modules/driver'
 require './modules/driver_navigations'
 require './modules/scrape_results'
-require 'parser'
 
 # The class to process tiktok data.
 class VideoParser
   include Driver
   include DriverNavigations
   include ScrapeResults
+
+  USER_URL = 'https://www.tiktok.com/@'
 
   private
 

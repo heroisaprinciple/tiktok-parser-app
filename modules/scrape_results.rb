@@ -1,4 +1,6 @@
 module ScrapeResults
+  NAVIGATION_SLEEP_TIME = 3
+
   # Scrapes user data.
   #
   # @param number [Integer] The number of queries to search for on TikTok.

@@ -1,5 +1,3 @@
-require './variables'
-
 module DriverNavigations
   URL = 'https://www.tiktok.com/search?q='
   SCROLL_SLEEP_TIME = 2
