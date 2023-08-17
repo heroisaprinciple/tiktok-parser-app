@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require './parser'
+require './video_scraper'
 require './csv_generator'
 
 def process_tiktok_data
@@ -12,9 +13,13 @@ def process_tiktok_data
 
   scraper = TikTokParser.new
   data = scraper.scrape_data(query, number)
-
   csv_generator = CSVGenerator.new
-  csv_generator.generate_csv(data)
+  csv_generator.generate_csv_for_user(data)
+  csv_generator.message_csv_creation
+
+  video_scraper = VideoParser.new
+  video_data = video_scraper.scrape_data(query, number)
+  csv_generator.generate_csv_for_video(video_data)
   csv_generator.message_csv_creation
 end
 
