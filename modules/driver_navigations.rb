@@ -1,6 +1,10 @@
 require './variables'
 
 module DriverNavigations
+  URL = 'https://www.tiktok.com/search?q='
+  SCROLL_SLEEP_TIME = 2
+  NAVIGATION_SLEEP_TIME = 3
+  
   def sleep_time(seconds)
     sleep(seconds)
   end
