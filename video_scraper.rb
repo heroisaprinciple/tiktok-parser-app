@@ -4,10 +4,10 @@ require 'httparty'
 require 'selenium-webdriver'
 require 'byebug'
 
-require './variables'
 require './modules/driver'
 require './modules/driver_navigations'
 require './modules/scrape_results'
+require 'parser'
 
 # The class to process tiktok data.
 class VideoParser
