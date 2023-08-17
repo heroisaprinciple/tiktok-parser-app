@@ -4,7 +4,6 @@ require 'httparty'
 require 'selenium-webdriver'
 require 'byebug'
 
-require './variables'
 require './modules/driver'
 require './modules/driver_navigations'
 require './modules/scrape_results'
@@ -14,6 +13,10 @@ class TikTokParser
   include Driver
   include DriverNavigations
   include ScrapeResults
+
+  USER_URL = 'https://www.tiktok.com/@'
+  EMAIL_REGEX = /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}\b/i
+  SOCIALS_REGEX = /\W(Twitter|IG|Insta(?:gram)?|Snapchat|Skype|Discord|Twitch):?\s?-?\s?\(?-?@?(\w+)\)?/i
 
   private
 
